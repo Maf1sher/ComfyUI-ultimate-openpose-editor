@@ -57,9 +57,19 @@ class OpenposeEditorDialog extends ComfyDialog {
             const message = event.data;
             if (message.modalId === 0) {
                 const targetNode = ComfyApp.clipspace_return_node;
-                const textAreaElement = targetNode.widgets[14].element;
-                textAreaElement.value = JSON.stringify(event.data.poses);
-		ComfyApp.onClipspaceEditorClosed();
+                const poseJsonWidget = targetNode.widgets.find(w => w.name === "POSE_JSON");
+                if (poseJsonWidget) {
+                    const value = JSON.stringify(event.data.poses);
+                    poseJsonWidget.value = value;
+                    if (poseJsonWidget.element) {
+                        poseJsonWidget.element.value = value;
+                    }
+                    if (poseJsonWidget.callback) {
+                        poseJsonWidget.callback(value);
+                    }
+                    app.graph.setDirtyCanvas(true, true);
+                }
+                ComfyApp.onClipspaceEditorClosed();
                 this.close();
             }
         });
@@ -88,26 +98,54 @@ class OpenposeEditorDialog extends ComfyDialog {
         }
 
         const targetNode = ComfyApp.clipspace_return_node;
-        if (targetNode.inputs?.[0].link || targetNode.inputs?.[targetNode.inputs.length-1].widget){
-            const textAreaElement = targetNode.widgets[15].element;
-            this.element.style.display = "flex";
-            this.setCanvasJSONString(textAreaElement.value.replace(/'/g, '"'));
-        } else {
-            const textAreaElement = targetNode.widgets[14].element;
-            this.element.style.display = "flex";
-            if (textAreaElement.value === "") {
-                let resolution_x = targetNode.widgets[3].value;
-                let resolution_y = Math.floor(768*(resolution_x*1.0/512));
-                if (resolution_x < 64){
-                    resolution_x = 512;
-                    resolution_y = 768;
-                }
+        const poseJsonWidget = targetNode.widgets.find(w => w.name === "POSE_JSON");
+        const resolutionXWidget = targetNode.widgets.find(w => w.name === "resolution_x");
 
-                let pose = `[{"people": [{"pose_keypoints_2d": [], "face_keypoints_2d": [], "hand_left_keypoints_2d": [], "hand_right_keypoints_2d": []}], "canvas_height": ${resolution_y}, "canvas_width": ${resolution_x}}]`;
-                this.setCanvasJSONString(pose);
-            } else {
-                this.setCanvasJSONString(textAreaElement.value.replace(/'/g, '"'));
+        if (!poseJsonWidget) {
+            console.error("[OpenposeEditor] POSE_JSON widget not found");
+            return;
+        }
+
+        const textAreaElement = poseJsonWidget.element;
+        this.element.style.display = "flex";
+
+        // Handle background image
+        let imageURL = null;
+        if (targetNode.inputs) {
+            const bgInputIndex = targetNode.inputs.findIndex(i => i.name === "background_image");
+            if (bgInputIndex !== -1 && targetNode.inputs[bgInputIndex].link) {
+                // If there's an image connected, we try to get its data
+                // In ComfyUI, we can sometimes get the image from the node's internal state if it was already processed
+                // or we might need to wait for it.
+                // For simplicity, let's see if we can access the image data from the output of the linked node
+                const linkId = targetNode.inputs[bgInputIndex].link;
+                const originNodeId = app.graph.links[linkId].origin_id;
+                const originNode = app.graph.getNodeById(originNodeId);
+                
+                if (originNode && originNode.imgs) {
+                    const img = originNode.imgs[0];
+                    if (img instanceof HTMLImageElement || img instanceof HTMLCanvasElement) {
+                        imageURL = img.src || img.toDataURL();
+                    }
+                }
             }
+        }
+
+        if (textAreaElement.value === "" || textAreaElement.value === "[]" || textAreaElement.value === "null") {
+            let resolution_x = resolutionXWidget ? resolutionXWidget.value : 512;
+            let resolution_y = Math.floor(768 * (resolution_x * 1.0 / 512));
+            if (resolution_x < 64) {
+                resolution_x = 512;
+                resolution_y = 768;
+            }
+
+            const body = Array(54).fill(0);
+            const face = Array(210).fill(0);
+            const hand = Array(63).fill(0);
+            let pose = `[{"people": [{"pose_keypoints_2d": ${JSON.stringify(body)}, "face_keypoints_2d": ${JSON.stringify(face)}, "hand_left_keypoints_2d": ${JSON.stringify(hand)}, "hand_right_keypoints_2d": ${JSON.stringify(hand)}}], "canvas_height": ${resolution_y}, "canvas_width": ${resolution_x}}]`;
+            this.setCanvasJSONString(pose, imageURL);
+        } else {
+            this.setCanvasJSONString(textAreaElement.value.replace(/'/g, '"'), imageURL);
         }
     }
 
@@ -148,10 +186,11 @@ class OpenposeEditorDialog extends ComfyDialog {
         });
     }
 
-    setCanvasJSONString(jsonString) {
+    setCanvasJSONString(jsonString, imageURL = null) {
         this.iframeElement.contentWindow.postMessage({
             modalId: 0,
-            poses: JSON.parse(jsonString)
+            poses: JSON.parse(jsonString),
+            imageURL: imageURL
         }, "*");
     }
 }
