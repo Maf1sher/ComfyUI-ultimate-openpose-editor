@@ -102479,6 +102479,20 @@ function print() { __p += __j.call(arguments, '') }
         resetZoom() {
           this.canvas && this.canvas.setViewportTransform(qO);
         },
+        resizeToBackground() {
+          if (this.uploadedImageList.length > 0) {
+            const lastImageInfo =
+              this.uploadedImageList[this.uploadedImageList.length - 1];
+            const fabricImage = this.canvasImageMap.get(lastImageInfo.uid);
+            if (fabricImage) {
+              this.canvasWidth = fabricImage.width;
+              this.canvasHeight = fabricImage.height;
+              this.resizeOpenposeCanvas(this.canvasWidth, this.canvasHeight);
+              this.scaleImage(lastImageInfo, 1);
+              this.resetZoom();
+            }
+          }
+        },
         zoomToGroup(t, e = 1) {
           if (!this.canvas) return;
           const n = t.getBoundingRect(),
@@ -102925,6 +102939,16 @@ function print() { __p += __j.call(arguments, '') }
                         { onClick: e[3] || (e[3] = (k) => t.resetZoom()) },
                         {
                           default: Rt(() => [Sn(Jn(t.$t("ui.resetZoom")), 1)]),
+                          _: 1,
+                        },
+                      ),
+                      w(
+                        l,
+                        { onClick: (k) => t.resizeToBackground() },
+                        {
+                          default: Rt(() => [
+                            Sn(Jn(t.$t("ui.resizeToBackground")), 1),
+                          ]),
                           _: 1,
                         },
                       ),
@@ -106628,6 +106652,7 @@ function print() { __p += __j.call(arguments, '') }
           keybinding: "Key Bindings",
           canvas: "Canvas",
           resizeCanvas: "Resize Canvas",
+          resizeToBackground: "Resize to Background",
           resetZoom: "Reset Zoom",
           backgroundImage: "Background Image",
           uploadImage: "Upload Image",
@@ -106653,7 +106678,8 @@ function print() { __p += __j.call(arguments, '') }
           sendPose: "发送姿势到ControlNet",
           keybinding: "键位绑定",
           canvas: "画布",
-          resizeCanvas: "调整画布大小",
+          resizeCanvas: "調整画布大小",
+          resizeToBackground: "Resize to Background",
           resetZoom: "重置画布缩放",
           backgroundImage: "背景图片",
           uploadImage: "上传图片",
@@ -106680,6 +106706,7 @@ function print() { __p += __j.call(arguments, '') }
           keybinding: "キーバインディング",
           canvas: "キャンバス",
           resizeCanvas: "キャンバスのサイズを調整",
+          resizeToBackground: "Resize to Background",
           resetZoom: "ズームをリセット",
           backgroundImage: "背景画像",
           uploadImage: "画像をアップロード",
