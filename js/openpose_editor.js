@@ -114,25 +114,22 @@ class OpenposeEditorDialog extends ComfyDialog {
         if (targetNode.inputs) {
             const bgInputIndex = targetNode.inputs.findIndex(i => i.name === "background_image");
             if (bgInputIndex !== -1 && targetNode.inputs[bgInputIndex].link) {
-                // If there's an image connected, we try to get its data
-                // In ComfyUI, we can sometimes get the image from the node's internal state if it was already processed
-                // or we might need to wait for it.
-                // For simplicity, let's see if we can access the image data from the output of the linked node
                 const linkId = targetNode.inputs[bgInputIndex].link;
-                const originNodeId = app.graph.links[linkId].origin_id;
-                const originNode = app.graph.getNodeById(originNodeId);
-                
-                if (originNode && originNode.imgs) {
-                    const img = originNode.imgs[0];
-                    if (img instanceof HTMLImageElement || img instanceof HTMLCanvasElement) {
-                        imageURL = img.src || img.toDataURL();
+                const link = app.graph.links[linkId];
+                if (link) {
+                    const originNode = app.graph.getNodeById(link.origin_id);
+                    const img = this.findImageSource(originNode);
+                    if (img) {
+                        if (img instanceof HTMLImageElement || img instanceof HTMLCanvasElement) {
+                            imageURL = img.src || img.toDataURL();
+                        }
                     }
                 }
             }
         }
 
         if (textAreaElement.value === "" || textAreaElement.value === "[]" || textAreaElement.value === "null") {
-            let resolution_x = resolutionXWidget ? resolutionXWidget.value : 512;
+            let resolution_x = resolutionXWidget ? resolution_xWidget.value : 512;
             let resolution_y = Math.floor(768 * (resolution_x * 1.0 / 512));
             if (resolution_x < 64) {
                 resolution_x = 512;
@@ -147,6 +144,30 @@ class OpenposeEditorDialog extends ComfyDialog {
         } else {
             this.setCanvasJSONString(textAreaElement.value.replace(/'/g, '"'), imageURL);
         }
+    }
+
+    findImageSource(node) {
+        if (!node) return null;
+        if (node.imgs && node.imgs.length > 0) {
+            return node.imgs[0];
+        }
+
+        // Recursive search through inputs
+        if (node.inputs) {
+            for (const input of node.inputs) {
+                if (input.link) {
+                    const link = app.graph.links[input.link];
+                    if (link) {
+                        const originNode = app.graph.getNodeById(link.origin_id);
+                        if (originNode) {
+                            const result = this.findImageSource(originNode);
+                            if (result) return result;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     createLayout() {
