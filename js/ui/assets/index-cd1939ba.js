@@ -102488,6 +102488,10 @@ function print() { __p += __j.call(arguments, '') }
               this.canvasWidth = fabricImage.width;
               this.canvasHeight = fabricImage.height;
               this.resizeOpenposeCanvas(this.canvasWidth, this.canvasHeight);
+              fabricImage.set({
+                left: this.openposeCanvas.left,
+                top: this.openposeCanvas.top,
+              });
               this.scaleImage(lastImageInfo, 1);
               this.resetZoom();
             }
